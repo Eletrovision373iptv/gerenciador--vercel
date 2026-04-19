@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { createClient } from '@supabase/supabase-client';
 
-// Configuração do Supabase (Substitua pelos seus dados)
-const supabase = createClient('SUA_URL_DO_SUPABASE', 'SUA_CHAVE_ANON_DO_SUPABASE');
+// Conexão via CDN (Pula o erro do NPM)
+const supabase = window.supabase.createClient(
+  'https://qznreydoxhycwmsdrkmm.supabase.co', 
+  'COLE_AQUI_SUA_CHAVE_ANON'
+);
 
 export default function App() {
   const [canais, setCanais] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Carregar canais do banco de dados
   useEffect(() => {
     fetchCanais();
   }, []);
@@ -19,41 +20,40 @@ export default function App() {
     setLoading(false);
   }
 
-  // Função para salvar novos links
   async function atualizarLinks(id, novosLinksArray) {
     const { error } = await supabase
       .from('canais')
       .update({ links: novosLinksArray })
       .eq('id', id);
 
-    if (error) alert("Erro ao salvar");
+    if (error) alert("Erro ao salvar: " + error.message);
     else {
-      alert("Links atualizados! O XCIPTV já está recebendo o novo sinal.");
+      alert("Sucesso! O XCIPTV já está com o novo sinal.");
       fetchCanais();
     }
   }
 
-  if (loading) return <div style={{padding: 50}}>Carregando Painel...</div>;
+  if (loading) return <div style={{padding: 50, color: '#fff', background: '#000', height: '100vh'}}>Carregando Canais...</div>;
 
   return (
-    <div style={{ padding: 20, fontFamily: 'Sora, sans-serif' }}>
-      <h1>Gerenciador de Sinais</h1>
+    <div style={{ padding: 20, fontFamily: 'sans-serif', background: '#0f172a', color: '#fff', minHeight: '100vh' }}>
+      <h1 style={{ color: '#38bdf8' }}>Gerenciador de Sinais Eletrovision</h1>
       <div style={{ display: 'grid', gap: '20px' }}>
         {canais.map(canal => (
-          <div key={canal.id} style={{ background: '#1a1a2e', padding: 20, borderRadius: 10 }}>
-            <h3>{canal.nome}</h3>
-            <p>ID do Link Eterno: <strong>{canal.id}</strong></p>
+          <div key={canal.id} style={{ background: '#1e293b', padding: 20, borderRadius: 12, border: '1px solid #334155' }}>
+            <h3 style={{ margin: '0 0 10px 0' }}>{canal.nome}</h3>
+            <p style={{ fontSize: '12px', color: '#94a3b8' }}>ID do Link Eterno: {canal.id}</p>
             
             {canal.links.map((link, index) => (
               <div key={index} style={{ marginBottom: 10 }}>
-                <label>Fonte {index + 1}: </label>
+                <label style={{ display: 'block', fontSize: '12px' }}>Fonte {index + 1}:</label>
                 <input 
-                  style={{ width: '80%', padding: 5 }}
+                  style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px solid #475569', background: '#0f172a', color: '#fff' }}
                   defaultValue={link} 
                   onBlur={(e) => {
                     let novos = [...canal.links];
                     novos[index] = e.target.value;
-                    canal.links = novos; // Atualiza localmente antes de salvar
+                    canal.links = novos;
                   }}
                 />
               </div>
@@ -61,9 +61,9 @@ export default function App() {
             
             <button 
               onClick={() => atualizarLinks(canal.id, canal.links)}
-              style={{ background: '#4ecca3', color: '#fff', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: 5 }}
+              style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: 6, fontWeight: 'bold', marginTop: '10px' }}
             >
-              Salvar Alterações
+              Salvar Novos IPs
             </button>
           </div>
         ))}
