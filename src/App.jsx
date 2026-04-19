@@ -6,28 +6,30 @@ export default function App() {
   const [erro, setErro] = useState(null);
   const [view, setView] = useState("landing");
 
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
+  // Função que força o carregamento da biblioteca se a Vercel falhar
+  async function carregarSupabase() {
+    if (window.supabase) return window.supabase;
+    
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2";
+      script.onload = () => resolve(window.supabase);
+      script.onerror = () => reject(new Error("Falha ao baixar biblioteca. Verifique sua internet."));
+      document.head.appendChild(script);
+    });
+  }
 
   async function fetchCanais() {
     setLoading(true);
     setErro(null);
-    
-    // Tenta esperar a biblioteca carregar por até 3 segundos
-    let tentativas = 0;
-    while (!window.supabase && tentativas < 30) {
-      await new Promise(r => setTimeout(r, 100));
-      tentativas++;
-    }
-
     try {
-      if (!window.supabase) {
-        throw new Error("Aguardando conexão com o servidor... Tente atualizar a página.");
-      }
+      const supabaseLib = await carregarSupabase();
+      const supabase = supabaseLib.createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_KEY
+      );
 
-      const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
       const { data, error } = await supabase.from('canais').select('*');
-      
       if (error) throw error;
       setCanais(data || []);
     } catch (err) {
@@ -43,36 +45,35 @@ export default function App() {
 
   if (view === "landing") {
     return (
-      <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', fontFamily: 'sans-serif', padding: '20px', textAlign: 'center' }}>
-        <h2 style={{ color: '#fff', fontSize: '28px', marginTop: '40px' }}>Eletrovision</h2>
-        <h1 style={{ color: '#f59e0b', fontSize: '36px' }}>Gerenciador Pro</h1>
+      <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', textAlign: 'center', padding: '20px' }}>
+        <h1 style={{ color: '#f59e0b', marginTop: '50px' }}>Eletrovision Pro</h1>
         <button 
           onClick={() => setView("painel")}
-          style={{ width: '100%', padding: '20px', backgroundColor: '#f59e0b', color: '#000', border: 'none', borderRadius: '15px', fontWeight: 'bold', fontSize: '18px', marginTop: '30px' }}
+          style={{ width: '100%', padding: '20px', backgroundColor: '#f59e0b', borderRadius: '15px', fontWeight: 'bold', marginTop: '30px', border: 'none' }}
         >
-          ▶ Acessar Gerenciador
+          ▶ ACESSAR AGORA
         </button>
       </div>
     );
   }
 
   return (
-    <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', padding: '15px', fontFamily: 'sans-serif' }}>
-      <button onClick={() => setView("landing")} style={{ color: '#f59e0b', background: 'none', border: 'none', marginBottom: '20px' }}>← Voltar</button>
+    <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', padding: '15px' }}>
+      <button onClick={() => setView("landing")} style={{ color: '#f59e0b', background: 'none', border: 'none' }}>← Voltar</button>
       
       {erro && (
-        <div style={{ background: '#450a0a', padding: '15px', borderRadius: '10px', border: '1px solid #f87171' }}>
-          <p style={{ color: '#fca5a5', margin: 0 }}>{erro}</p>
-          <button onClick={fetchCanais} style={{ marginTop: '10px', background: '#f87171', border: 'none', padding: '5px 10px', borderRadius: '5px', color: '#fff' }}>Tentar Novamente</button>
+        <div style={{ background: '#450a0a', padding: '15px', borderRadius: '10px', marginTop: '20px', border: '1px solid #f87171' }}>
+          <p>Erro: {erro}</p>
+          <button onClick={fetchCanais} style={{ background: '#f87171', border: 'none', padding: '5px', borderRadius: '5px', color: '#fff' }}>Tentar de novo</button>
         </div>
       )}
 
-      {loading ? <p style={{textAlign:'center', marginTop: 50}}>Conectando aos IPs...</p> : (
-        <div>
-          {canais.map(canal => (
-            <div key={canal.id} style={{ background: '#16161e', padding: '15px', borderRadius: '12px', marginBottom: '15px', border: '1px solid #26262e' }}>
-              <p style={{ fontWeight: 'bold', color: '#f59e0b' }}>{canal.nome}</p>
-              {/* Campos de IP e Porta aqui */}
+      {loading ? <p style={{textAlign:'center'}}>Conectando ao Banco...</p> : (
+        <div style={{ marginTop: '20px' }}>
+          {canais.length === 0 && !erro && <p style={{textAlign:'center'}}>Conectado! Mas a tabela está vazia no Supabase.</p>}
+          {canais.map(c => (
+            <div key={c.id} style={{ background: '#16161e', padding: '15px', borderRadius: '12px', marginBottom: '10px' }}>
+              <p style={{ color: '#f59e0b', margin: 0 }}>{c.nome}</p>
             </div>
           ))}
         </div>
