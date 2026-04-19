@@ -5,78 +5,84 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Criamos a conexão aqui dentro para garantir que o 'window' já carregou
-  const supabase = window.supabase ? window.supabase.createClient(
-    'https://qznreydoxhycwmsdrkmm.supabase.co', 
-    'COLE_AQUI_SUA_CHAVE_ANON'
-  ) : null;
-
   useEffect(() => {
-    if (supabase) {
-      fetchCanais();
-    } else {
-      setError("Erro ao carregar Supabase. Verifique o arquivo index.html.");
-      setLoading(false);
-    }
+    const inicializar = () => {
+      // Pega as chaves da Vercel (precisam começar com VITE_)
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_KEY;
+
+      if (!window.supabase) {
+        // Se o script do index.html ainda não carregou, tenta de novo em breve
+        setTimeout(inicializar, 500);
+        return;
+      }
+
+      if (!url || !key) {
+        setError("As chaves VITE_SUPABASE_URL ou VITE_SUPABASE_KEY não foram encontradas na Vercel.");
+        setLoading(false);
+        return;
+      }
+
+      const supabase = window.supabase.createClient(url, key);
+      fetchCanais(supabase);
+    };
+
+    inicializar();
   }, []);
 
-  async function fetchCanais() {
+  async function fetchCanais(supabase) {
     try {
       const { data, error } = await supabase.from('canais').select('*');
       if (error) throw error;
       setCanais(data || []);
     } catch (err) {
-      setError(err.message);
+      setError("Erro ao buscar canais: " + err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  async function atualizarLinks(id, novosLinksArray) {
-    const { error } = await supabase
-      .from('canais')
-      .update({ links: novosLinksArray })
-      .eq('id', id);
+  async function salvar(id, novosLinks) {
+    try {
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_KEY;
+      const supabase = window.supabase.createClient(url, key);
 
-    if (error) alert("Erro ao salvar: " + error.message);
-    else {
-      alert("Sucesso! O XCIPTV já está com o novo sinal.");
-      fetchCanais();
+      const { error } = await supabase
+        .from('canais')
+        .update({ links: novosLinks })
+        .eq('id', id);
+
+      if (error) throw error;
+      alert("Sucesso! O sinal foi atualizado.");
+    } catch (err) {
+      alert("Erro ao salvar: " + err.message);
     }
   }
 
-  if (loading) return <div style={{padding: 50, color: '#fff', background: '#0f172a', height: '100vh'}}>Carregando Canais...</div>;
-  if (error) return <div style={{padding: 50, color: 'red'}}>{error}</div>;
+  if (loading) return <div style={{padding: 40, color: '#fff', textAlign: 'center'}}>Iniciando Painel...</div>;
+  if (error) return <div style={{padding: 40, color: '#ff4444'}}>{error}</div>;
 
   return (
-    <div style={{ padding: 20, fontFamily: 'sans-serif', background: '#0f172a', color: '#fff', minHeight: '100vh' }}>
-      <h1 style={{ color: '#38bdf8' }}>Gerenciador de Sinais Eletrovision</h1>
-      <div style={{ display: 'grid', gap: '20px' }}>
+    <div style={{ padding: '20px', color: '#fff', fontFamily: 'sans-serif' }}>
+      <h1 style={{ color: '#38bdf8', textAlign: 'center' }}>Eletrovision Sinais</h1>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {canais.map(canal => (
-          <div key={canal.id} style={{ background: '#1e293b', padding: 20, borderRadius: 12, border: '1px solid #334155' }}>
-            <h3 style={{ margin: '0 0 10px 0' }}>{canal.nome}</h3>
-            <p style={{ fontSize: '12px', color: '#94a3b8' }}>ID do Link Eterno: {canal.id}</p>
-            
-            {canal.links.map((link, index) => (
-              <div key={index} style={{ marginBottom: 10 }}>
-                <label style={{ display: 'block', fontSize: '12px' }}>Fonte {index + 1}:</label>
-                <input 
-                  style={{ width: '100%', padding: '8px', borderRadius: 4, border: '1px solid #475569', background: '#0f172a', color: '#fff' }}
-                  defaultValue={link} 
-                  onBlur={(e) => {
-                    let novos = [...canal.links];
-                    novos[index] = e.target.value;
-                    canal.links = novos;
-                  }}
-                />
-              </div>
+          <div key={canal.id} style={{ background: '#1e293b', padding: '15px', borderRadius: '10px', border: '1px solid #334155' }}>
+            <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>{canal.nome}</h2>
+            {canal.links && canal.links.map((link, index) => (
+              <input 
+                key={index}
+                style={{ width: '100%', padding: '10px', marginBottom: '10px', borderRadius: '5px', border: '1px solid #475569', background: '#0f172a', color: '#fff', boxSizing: 'border-box' }}
+                defaultValue={link}
+                onBlur={(e) => { canal.links[index] = e.target.value; }}
+              />
             ))}
-            
             <button 
-              onClick={() => atualizarLinks(canal.id, canal.links)}
-              style={{ background: '#0ea5e9', color: '#fff', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: 6, fontWeight: 'bold', marginTop: '10px' }}
+              onClick={() => salvar(canal.id, canal.links)}
+              style={{ width: '100%', padding: '12px', background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: '5px', fontWeight: 'bold' }}
             >
-              Salvar Novos IPs
+              SALVAR NOVO IP
             </button>
           </div>
         ))}
