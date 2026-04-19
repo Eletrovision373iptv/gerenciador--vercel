@@ -1,23 +1,35 @@
 import { useState, useEffect } from "react";
 
-// Conexão via CDN (Pula o erro do NPM)
-const supabase = window.supabase.createClient(
-  'https://qznreydoxhycwmsdrkmm.supabase.co', 
-  'COLE_AQUI_SUA_CHAVE_ANON'
-);
-
 export default function App() {
   const [canais, setCanais] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Criamos a conexão aqui dentro para garantir que o 'window' já carregou
+  const supabase = window.supabase ? window.supabase.createClient(
+    'https://qznreydoxhycwmsdrkmm.supabase.co', 
+    'COLE_AQUI_SUA_CHAVE_ANON'
+  ) : null;
 
   useEffect(() => {
-    fetchCanais();
+    if (supabase) {
+      fetchCanais();
+    } else {
+      setError("Erro ao carregar Supabase. Verifique o arquivo index.html.");
+      setLoading(false);
+    }
   }, []);
 
   async function fetchCanais() {
-    const { data } = await supabase.from('canais').select('*');
-    setCanais(data || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.from('canais').select('*');
+      if (error) throw error;
+      setCanais(data || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function atualizarLinks(id, novosLinksArray) {
@@ -33,7 +45,8 @@ export default function App() {
     }
   }
 
-  if (loading) return <div style={{padding: 50, color: '#fff', background: '#000', height: '100vh'}}>Carregando Canais...</div>;
+  if (loading) return <div style={{padding: 50, color: '#fff', background: '#0f172a', height: '100vh'}}>Carregando Canais...</div>;
+  if (error) return <div style={{padding: 50, color: 'red'}}>{error}</div>;
 
   return (
     <div style={{ padding: 20, fontFamily: 'sans-serif', background: '#0f172a', color: '#fff', minHeight: '100vh' }}>
