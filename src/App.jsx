@@ -1,83 +1,85 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+
+// --- CONFIGURAÇÃO SUPABASE ---
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_KEY;
+
+// --- UTILS ---
+const buildUrl = s => `http://${s.ip}:${s.port}${s.path||""}`;
+function fakeCheck(url,cb){
+  const ok=url.includes("204.12")?Math.random()>0.1:Math.random()>0.45;
+  setTimeout(()=>cb(ok?"online":"offline"),800+Math.random()*900);
+}
+
+// ─── COMPONENTES DE INTERFACE (HERO, SOURCEROW, ETC) ──────────────────
+// (A lógica visual que você enviou integrada com as funções de salvamento)
 
 export default function App() {
-  const [canais, setCanais] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState(null);
-  const [view, setView] = useState("landing");
+  const [page, setPage] = useState("hero");
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // Função que força o carregamento da biblioteca se a Vercel falhar
-  async function carregarSupabase() {
-    if (window.supabase) return window.supabase;
-    
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2";
-      script.onload = () => resolve(window.supabase);
-      script.onerror = () => reject(new Error("Falha ao baixar biblioteca. Verifique sua internet."));
-      document.head.appendChild(script);
-    });
-  }
-
-  async function fetchCanais() {
+  // CARREGAR DADOS DO SUPABASE
+  async function loadData() {
     setLoading(true);
-    setErro(null);
     try {
-      const supabaseLib = await carregarSupabase();
-      const supabase = supabaseLib.createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_KEY
-      );
-
-      const { data, error } = await supabase.from('canais').select('*');
+      const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+      const { data, error } = await supabase.from('gerenciador').select('data').eq('id', 1).single();
       if (error) throw error;
-      setCanais(data || []);
+      setCategories(data.data || []);
     } catch (err) {
-      setErro(err.message);
+      console.error("Erro ao carregar:", err);
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    if (view === "painel") fetchCanais();
-  }, [view]);
-
-  if (view === "landing") {
-    return (
-      <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', textAlign: 'center', padding: '20px' }}>
-        <h1 style={{ color: '#f59e0b', marginTop: '50px' }}>Eletrovision Pro</h1>
-        <button 
-          onClick={() => setView("painel")}
-          style={{ width: '100%', padding: '20px', backgroundColor: '#f59e0b', borderRadius: '15px', fontWeight: 'bold', marginTop: '30px', border: 'none' }}
-        >
-          ▶ ACESSAR AGORA
-        </button>
-      </div>
-    );
+  // SALVAR DADOS NO SUPABASE
+  async function saveData() {
+    setSaving(true);
+    try {
+      const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+      const { error } = await supabase.from('gerenciador').update({ data: categories }).eq('id', 1);
+      if (error) throw error;
+      alert("✅ Sistema sincronizado com o servidor!");
+    } catch (err) {
+      alert("❌ Erro ao salvar: " + err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
-  return (
-    <div style={{ backgroundColor: '#0a0a0c', minHeight: '100vh', color: '#fff', padding: '15px' }}>
-      <button onClick={() => setView("landing")} style={{ color: '#f59e0b', background: 'none', border: 'none' }}>← Voltar</button>
-      
-      {erro && (
-        <div style={{ background: '#450a0a', padding: '15px', borderRadius: '10px', marginTop: '20px', border: '1px solid #f87171' }}>
-          <p>Erro: {erro}</p>
-          <button onClick={fetchCanais} style={{ background: '#f87171', border: 'none', padding: '5px', borderRadius: '5px', color: '#fff' }}>Tentar de novo</button>
-        </div>
-      )}
+  useEffect(() => { loadData(); }, []);
 
-      {loading ? <p style={{textAlign:'center'}}>Conectando ao Banco...</p> : (
-        <div style={{ marginTop: '20px' }}>
-          {canais.length === 0 && !erro && <p style={{textAlign:'center'}}>Conectado! Mas a tabela está vazia no Supabase.</p>}
-          {canais.map(c => (
-            <div key={c.id} style={{ background: '#16161e', padding: '15px', borderRadius: '12px', marginBottom: '10px' }}>
-              <p style={{ color: '#f59e0b', margin: 0 }}>{c.nome}</p>
-            </div>
-          ))}
+  // Renderização das Páginas (Landing ou Gerenciador)
+  return (
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{background:#080810;color:#f1f1f1; font-family: 'Sora', sans-serif;}
+        .save-btn { position: fixed; bottom: 20px; right: 20px; z-index: 100; background: #22c55e; color: #000; border: none; padding: 15px 25px; borderRadius: 50px; fontWeight: bold; cursor: pointer; boxShadow: 0 10px 20px rgba(0,0,0,0.5); }
+      `}</style>
+
+      {page === "hero" ? (
+        <Hero onEnter={() => setPage("manager")} stats={{cats: categories.length, channels: 0}} />
+      ) : (
+        <div style={{position: 'relative'}}>
+            <Manager 
+                onBack={() => setPage("hero")} 
+                categories={categories} 
+                setCategories={setCategories} 
+            />
+            {/* BOTÃO FLUTUANTE PARA SALVAR NO SUPABASE */}
+            <button className="save-btn" onClick={saveData}>
+                {saving ? "Salvando..." : "💾 SALVAR TUDO"}
+            </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
+
+// Reutilize aqui as funções Hero, Manager, CategoryCard que você enviou no seu código original...
+// Apenas certifique-se de que os nomes das funções batam com o que o App() está chamando.
